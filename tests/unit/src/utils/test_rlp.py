@@ -1,5 +1,6 @@
 import os
 import random
+
 import pytest
 import pytest_asyncio
 from rlp import decode
@@ -16,12 +17,20 @@ async def rlp(starknet):
 
 @pytest.fixture
 def long_list():
-    return list(bytes.fromhex("80850430e2340082520894dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd01801ba0110d8fee1de53df0870e6eb599ed3bf68fb3f1e62c82dfe5976c467c97253b15a03450b73d2aef2009f026bcbf097a257ae7a37eb5d3b73dc0760aefad2b98e327"))
+    return list(
+        bytes.fromhex(
+            "80850430e2340082520894dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd01801ba0110d8fee1de53df0870e6eb599ed3bf68fb3f1e62c82dfe5976c467c97253b15a03450b73d2aef2009f026bcbf097a257ae7a37eb5d3b73dc0760aefad2b98e327"
+        )
+    )
 
 
 @pytest.fixture
 def short_list():
-    return list(bytes.fromhex("80850430e2340082520801801ba0110d8fee1de53df0870e6eb599ed3bf68fb3f1e62c82dfe5976c467c97253b15"))
+    return list(
+        bytes.fromhex(
+            "80850430e2340082520801801ba0110d8fee1de53df0870e6eb599ed3bf68fb3f1e62c82dfe5976c467c97253b15"
+        )
+    )
 
 
 # using https://etherscan.io/getRawTx?tx= to get samples
@@ -80,8 +89,7 @@ class TestRLP:
         async def test_should_decode_string_gt_55(self, rlp):
             data_len = random.randint(56, 100000)
             string = list(os.urandom(data_len))
-            data_len = list(data_len.to_bytes(
-                (data_len.bit_length() + 7) // 8, "big"))
+            data_len = list(data_len.to_bytes((data_len.bit_length() + 7) // 8, "big"))
             data_len_len = len(data_len)
             prefix = 0xB7 + data_len_len
             decoded = await rlp.test__rlp_decode_at_index(
