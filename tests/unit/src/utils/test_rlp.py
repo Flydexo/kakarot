@@ -73,13 +73,16 @@ class TestRLP:
             assert expected_list == rlp_list.result.data
 
     class TestRLPDecode:
-        @pytest.mark.parametrize("data", [
-            bytes([random.randint(0, 127)]),
-            os.urandom(random.randint(2, 54)),
-            os.urandom(random.randint(56, 10000)),
-            b'This is a string shorter than 55 bytes',
-            b'This is a string longer than 55 bytes, so to make it longer I need to write some more text so the string is actually longer than 55 bytes',
-        ])
+        @pytest.mark.parametrize(
+            "data",
+            [
+                bytes([random.randint(0, 127)]),
+                os.urandom(random.randint(2, 54)),
+                os.urandom(random.randint(56, 10000)),
+                b"This is a string shorter than 55 bytes",
+                b"This is a string longer than 55 bytes, so to make it longer I need to write some more text so the string is actually longer than 55 bytes",
+            ],
+        )
         async def test_should_match_decode_reference_implementation(self, rlp, data):
             decoded = await rlp.test__rlp_decode_at_index(list(encode(data)), 0).call()
             assert decoded.result.data == list(data)
