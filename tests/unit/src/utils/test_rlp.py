@@ -3,7 +3,7 @@ import random
 
 import pytest
 import pytest_asyncio
-from rlp import decode
+from rlp import decode, encode
 
 
 @pytest_asyncio.fixture
@@ -53,8 +53,8 @@ RAW_TX_SAMPLES = [
 @pytest.mark.asyncio
 class TestRLP:
     class TestRLPListEncode:
-        async def test_should_encode_rlp_list_longer_55_bytes(self, rlp, long_list):
-            rlp_list = await rlp.test__encode_rlp_list(long_list).call()
+        async def test_should_encode_list_longer_55_bytes(self, rlp, long_list):
+            rlp_list = await rlp.test__encode_list(long_list).call()
             data_len = len(long_list)
             data_len_len = (data_len.bit_length() + 7) // 8
             prefix = 0xF7 + data_len_len
@@ -65,41 +65,27 @@ class TestRLP:
             ]
             assert expected_list == rlp_list.result.data
 
-        async def test_should_encode_rlp_list_smaller_55_bytes(self, rlp, short_list):
-            rlp_list = await rlp.test__encode_rlp_list(short_list).call()
+        async def test_should_encode_list_smaller_55_bytes(self, rlp, short_list):
+            rlp_list = await rlp.test__encode_list(short_list).call()
             data_len = len(short_list)
             prefix = 0xC0 + data_len
             expected_list = [prefix, *short_list]
             assert expected_list == rlp_list.result.data
 
     class TestRLPDecode:
-        async def test_should_decode_int_le_127(self, rlp):
-            number = random.randint(0, 127)
-            decoded = await rlp.test__rlp_decode_at_index([number], 0).call()
-            assert decoded.result.data == [number]
-            assert decoded.result.is_list == False
-
-        async def test_should_decode_string_le_55(self, rlp):
-            string = list(os.urandom(random.randint(2, 54)))
-            prefix = 0x80 + len(string)
-            decoded = await rlp.test__rlp_decode_at_index([prefix, *string], 0).call()
-            assert decoded.result.data == string
-            assert decoded.result.is_list == False
-
-        async def test_should_decode_string_gt_55(self, rlp):
-            data_len = random.randint(56, 100000)
-            string = list(os.urandom(data_len))
-            data_len = list(data_len.to_bytes((data_len.bit_length() + 7) // 8, "big"))
-            data_len_len = len(data_len)
-            prefix = 0xB7 + data_len_len
-            decoded = await rlp.test__rlp_decode_at_index(
-                [prefix, *data_len, *string], 0
-            ).call()
-            assert decoded.result.data == string
-            assert decoded.result.is_list == False
+        @pytest.mark.parametrize("data", [
+            bytes([random.randint(0, 127)]),
+            os.urandom(random.randint(2, 54)),
+            os.urandom(random.randint(56, 10000)),
+            b'This is a string shorter than 55 bytes',
+            b'This is a string longer than 55 bytes, so to make it longer I need to write some more text so the string is actually longer than 55 bytes',
+        ])
+        async def test_should_match_decode_reference_implementation(self, rlp, data):
+            decoded = await rlp.test__rlp_decode_at_index(list(encode(data)), 0).call()
+            assert decoded.result.data == list(data)
 
         @pytest.mark.parametrize("raw_tx", RAW_TX_SAMPLES)
-        async def test_should_decode_list_le_55(self, rlp, raw_tx):
+        async def test_should_decode_txns(self, rlp, raw_tx):
             contract_decoded = await rlp.test__rlp_decode_at_index(
                 list(raw_tx), 0
             ).call()
