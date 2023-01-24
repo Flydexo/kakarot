@@ -641,18 +641,33 @@ namespace Helpers {
     // @param bytes_len The number of bytes (used for recursion, set to 0)
     // @param bytes The pointer to the bytes
     // @return bytes_len The final length of the bytes array
-    func felt_to_bytes{range_check_ptr}(value: felt, bytes_len: felt, bytes: felt*) -> (
+    func felt_to_bytes_little{range_check_ptr}(value: felt, bytes_len: felt, bytes: felt*) -> (
         bytes_len: felt
     ) {
-        let (q, r) = unsigned_div_rem(value, 256);
-        let is_le_256 = is_le(r, 256);
+        let is_le_256 = is_le(value, 256);
         if (is_le_256 != FALSE) {
             assert [bytes] = value;
             return (bytes_len=bytes_len + 1);
         } else {
+            let (q, r) = unsigned_div_rem(value, 256);
             assert [bytes] = r;
-            return felt_to_bytes(value=q, bytes_len=bytes_len + 1, bytes=bytes + 1);
+            return felt_to_bytes_little(value=q, bytes_len=bytes_len + 1, bytes=bytes + 1);
         }
+    }
+
+    // @notice transform a felt to little endian bytes
+    // @param value The initial felt
+    // @param bytes_len The number of bytes (used for recursion, set to 0)
+    // @param bytes The pointer to the bytes
+    // @return bytes_len The final length of the bytes array
+    func felt_to_bytes{range_check_ptr}(value: felt, bytes_len: felt, bytes: felt*) -> (
+        bytes_len: felt
+    ) {
+        alloc_locals;
+        let (local little: felt*) = alloc();
+        let little_res = felt_to_bytes_little(value, bytes_len, little);
+        reverse(little_res.bytes_len, little, little_res.bytes_len, bytes);
+        return little_res;
     }
 
     // @notice transform muliple bytes into a single felt
