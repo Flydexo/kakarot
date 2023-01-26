@@ -27,7 +27,7 @@ namespace RLP {
     // @param data_len The lenght of the bytes
     // @param data The pointer to the first byte in array
     // @param items A pointer to an empty array of items, will be filled with found items
-    func decode_rlp{
+    func decode{
         syscall_ptr: felt*,
         pedersen_ptr: HashBuiltin*,
         bitwise_ptr: BitwiseBuiltin*,
@@ -48,7 +48,7 @@ namespace RLP {
                     data=buffer_ptr - 1,
                     is_list=0
                     );
-                return decode_rlp(data_len=data_len - 1, data=buffer_ptr, items=items + Item.SIZE);
+                return decode(data_len=data_len - 1, data=buffer_ptr, items=items + Item.SIZE);
             }
             let is_le_183 = is_le(byte, 183);  // a max 55 bytes long string
             if (is_le_183 != FALSE) {
@@ -58,7 +58,7 @@ namespace RLP {
                     data=buffer_ptr,
                     is_list=0
                     );
-                return decode_rlp(
+                return decode(
                     data_len=data_len - 1 - string_len,
                     data=buffer_ptr + string_len,
                     items=items + Item.SIZE,
@@ -74,7 +74,7 @@ namespace RLP {
                     data=buffer_ptr,
                     is_list=0
                     );
-                return decode_rlp(
+                return decode(
                     data_len=data_len - 1 - len_len - dlen,
                     data=buffer_ptr + dlen,
                     items=items + Item.SIZE,
@@ -88,14 +88,12 @@ namespace RLP {
                     data=buffer_ptr,
                     is_list=1
                     );
-                return decode_rlp(
+                return decode(
                     data_len=data_len - 1 - list_len,
                     data=buffer_ptr + list_len,
                     items=items + Item.SIZE,
                 );
-            }
-            let is_le_255 = is_le(byte, 255);  // list > 55 bytes
-            if (is_le_255 != FALSE) {
+            } else {
                 local list_len_len = byte - 247;
                 let (dlen) = Helpers.bytes_to_felt(data_len=list_len_len, data=buffer_ptr, n=0);
                 let buffer_ptr = buffer_ptr + list_len_len;
@@ -104,13 +102,12 @@ namespace RLP {
                     data=buffer_ptr,
                     is_list=1
                     );
-                return decode_rlp(
+                return decode(
                     data_len=data_len - 1 - list_len_len - dlen,
                     data=buffer_ptr + dlen,
                     items=items + Item.SIZE,
                 );
             }
-            return ();
         }
     }
 
@@ -120,7 +117,7 @@ namespace RLP {
     // @param data The pointer to the first byte in the array to copy from
     // @param rlp The pointer receiving the rlp encoded list
     // @return rlp_len The length of the encoded list in bytes
-    func encode_rlp_list{
+    func encode_list{
         syscall_ptr: felt*,
         pedersen_ptr: HashBuiltin*,
         bitwise_ptr: BitwiseBuiltin*,
@@ -138,7 +135,80 @@ namespace RLP {
             assert rlp[0] = 0xf7 + bytes_len;
             Helpers.fill_array(bytes_len, bytes, rlp + 1);
             Helpers.fill_array(data_len, data, rlp + 1 + bytes_len);
-            return (rlp_len=data_len + 1);
+            return (rlp_len=data_len + 1 + bytes_len);
+        }
+    }
+
+    // @notice encodes felt into an rlp item
+    // @param item The felt that is encoded into rlp
+    // @param rlp_len The length of the rlp array
+    // @param rlp The pointer receiving the rlp encoded felt
+    // @return rlp_len The length of the encoded felt in bytes
+    func encode_felt{
+        syscall_ptr: felt*,
+        pedersen_ptr: HashBuiltin*,
+        bitwise_ptr: BitwiseBuiltin*,
+        range_check_ptr,
+    }(item: felt, rlp_len: felt, rlp: felt*) -> (rlp_len: felt) {
+        alloc_locals;
+        // 127 is the largest value that can be represented by one byte
+        let item_is_single_byte = is_le(item, 127);
+
+        if (item_is_single_byte != FALSE) {
+            // single byte needs no prefix
+            assert [rlp + rlp_len] = item;
+            return (rlp_len + 1,);
+        } else {
+            // otherwise, we need to convert the value to an unpadded byte array
+            let (local reversed_item_bytes: felt*) = alloc();
+            let (local item_bytes: felt*) = alloc();
+
+            let (item_high, item_low) = split_felt(item);
+            let (item_bytes_len) = Helpers.uint256_to_bytes_no_padding(
+                Uint256(low=item_low, high=item_high), 0, reversed_item_bytes, item_bytes
+            );
+
+            let (updated_rlp_len) = encode_byte_array(item_bytes_len, item_bytes, rlp_len, rlp);
+            return (updated_rlp_len,);
+        }
+    }
+
+    // @notice encodes byte array into an rlp element
+    // @param byte_array_len The length of the bytes to copy from
+    // @param byte_array The pointer to the first byte in the array to copy from
+    // @param rlp The pointer receiving the rlp encoded list
+    // @return rlp_len The length of the encoded list in bytes
+    func encode_byte_array{
+        syscall_ptr: felt*,
+        pedersen_ptr: HashBuiltin*,
+        bitwise_ptr: BitwiseBuiltin*,
+        range_check_ptr,
+    }(byte_array_len, byte_array: felt*, rlp_len: felt, rlp: felt*) -> (rlp_len: felt) {
+        alloc_locals;
+
+        let item_len_is_le_55 = is_le(byte_array_len, 55);
+
+        if (item_len_is_le_55 != FALSE) {
+            // when the bytes array length is less than 55 bytes, we encode it with a single prefix
+            assert [rlp + rlp_len] = 0x80 + byte_array_len;
+            Helpers.fill_array(byte_array_len, byte_array, rlp + rlp_len + 1);
+            return (rlp_len + byte_array_len + 1,);
+        } else {
+            // otherwise we encode in a prefix
+            // the length
+            // of
+            // the value of the length of item's byte representation
+            // then the actual length of the the bytes representation of item
+            // then the element bytes (phew)
+            let (local item_len_bytes: felt*) = alloc();
+            // note the subtle shift of terms: we are taking the value of the length of bytes of the item and converting it to bytes!
+            let (item_len_bytes_len) = Helpers.felt_to_bytes(byte_array_len, 0, item_len_bytes);
+            assert [rlp + rlp_len] = 0xb7 + item_len_bytes_len;
+            Helpers.fill_array(item_len_bytes_len, item_len_bytes, rlp + rlp_len + 1);
+
+            Helpers.fill_array(byte_array_len, byte_array, rlp + rlp_len + 1 + item_len_bytes_len);
+
+            return (rlp_len + item_len_bytes_len + byte_array_len + 1,);
         }
     }
 

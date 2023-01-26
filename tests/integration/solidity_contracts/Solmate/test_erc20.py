@@ -148,6 +148,25 @@ class TestERC20:
             assert await erc_20.balanceOf(from_wallet.address) == 0
             assert await erc_20.balanceOf(others[1].address) == TEST_SUPPLY
 
+        async def test_transfer_should_fail_when_insufficient_balance(
+            self, erc_20, owner, other
+        ):
+            await erc_20.mint(
+                owner.address, TEST_AMOUNT, caller_address=owner.starknet_address
+            )
+            with pytest.raises(Exception) as e:
+                await erc_20.transfer(
+                    other.address,
+                    TEST_SUPPLY,
+                    caller_address=owner.starknet_address,
+                )
+
+            message = re.search(r"Error message: (.*)", e.value.message)[
+                1
+            ]  # type: ignore
+            # TODO: update with https://github.com/sayajin-labs/kakarot/issues/416
+            assert message == "Kakarot: Reverted with reason: 12884901888"
+
         async def test_transfer_from_should_fail_when_insufficient_allowance(
             self, erc_20, owner, other, others
         ):
@@ -166,6 +185,15 @@ class TestERC20:
                     TEST_SUPPLY,
                     caller_address=owner.starknet_address,
                 )
+
+            message = re.search(r"Error message: (.*)", e.value.message)[
+                1
+            ]  # type: ignore
+            # TODO: update with https://github.com/sayajin-labs/kakarot/issues/416
+            assert (
+                message
+                == "Kakarot: Reverted with reason: 109161241298996469498303502024926298112"
+            )
 
         async def test_transfer_from_should_fail_when_insufficient_balance(
             self, erc_20, owner, other, others
@@ -188,6 +216,12 @@ class TestERC20:
                     TEST_SUPPLY,
                     caller_address=owner.starknet_address,
                 )
+
+            message = re.search(r"Error message: (.*)", e.value.message)[
+                1
+            ]  # type: ignore
+            # TODO: update with https://github.com/sayajin-labs/kakarot/issues/416
+            assert message == "Kakarot: Reverted with reason: 12884901888"
 
     class TestPermit:
         async def test_should_permit(self, blockhashes, erc_20, owner, other):
@@ -248,6 +282,12 @@ class TestERC20:
                     caller_address=owner.starknet_address,
                 )
 
+            message = re.search(r"Error message: (.*)", e.value.message)[
+                1
+            ]  # type: ignore
+            # TODO: update with https://github.com/sayajin-labs/kakarot/issues/416
+            assert message == "Kakarot: Reverted with reason: 0"
+
         async def test_permit_should_fail_with_bad_deadline(
             self, erc_20, blockhashes, owner, other
         ):
@@ -276,6 +316,12 @@ class TestERC20:
                     s,
                     caller_address=owner.starknet_address,
                 )
+
+            message = re.search(r"Error message: (.*)", e.value.message)[
+                1
+            ]  # type: ignore
+            # TODO: update with https://github.com/sayajin-labs/kakarot/issues/416
+            assert message == "Kakarot: Reverted with reason: 147028384"
 
         async def test_permit_should_fail_on_replay(
             self, blockhashes, erc_20, owner, other
@@ -316,3 +362,9 @@ class TestERC20:
                     s,
                     caller_address=owner.starknet_address,
                 )
+
+            message = re.search(r"Error message: (.*)", e.value.message)[
+                1
+            ]  # type: ignore
+            # TODO: update with https://github.com/sayajin-labs/kakarot/issues/416
+            assert message == "Kakarot: Reverted with reason: 0"
